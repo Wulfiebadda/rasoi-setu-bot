@@ -1,18 +1,15 @@
 {
   "name": "rasoi-setu-bot",
   "version": "1.0.0",
-  "description": "",
+  "description": "WhatsApp Bot for Rasoi Setu",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "@google/genai": "^2.5.0",
-    "@whiskeysockets/baileys": "^7.0.0-rc12",
+    "@google/genai": "^0.1.1",
+    "@whiskeysockets/baileys": "^6.7.5",
+    "mongodb": "^6.5.0",
     "qrcode-terminal": "^0.12.0"
   }
 }
