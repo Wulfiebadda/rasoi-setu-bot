@@ -1,19 +1,19 @@
 const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
 const { GoogleGenAI } = require('@google/genai');
 const http = require('http');
 
-// 1. Render.com par 24/7 chalane ke liye chhota sa Dummy Server
+// Render.com par 24/7 chalane ke liye chhota sa Dummy Server
 http.createServer((req, res) => res.end('Rasoi Setu Bot is alive!')).listen(process.env.PORT || 3000);
 
-// 2. Gemini Initialize (API Key check)
 if (!process.env.GEMINI_API_KEY) {
-    console.error("❌ ERROR: Gemini API Key nahi mili! Pehle terminal me key set karein.");
+    console.error("❌ ERROR: Gemini API Key nahi mili! Pehle Render me key set karein.");
     process.exit(1);
 }
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// 3. Rasoi Setu Ka System Prompt
+// 👇 YAHAN APNA BOT WALA WHATSAPP NUMBER DALEIN (91 ke sath)
+const phoneNumber = "918860088652"; // Example: "919876543210"
+
 const rasoiSetuPrompt = `
 Aap "Rasoi Setu" ke ek expert, professional aur helpful WhatsApp Chatbot hain. 
 Aapka kaam restaurant owners, cloud kitchens aur cafe owners ko Rasoi Setu platform ke baare me jankari dena hai. 
@@ -37,29 +37,37 @@ async function startBot() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true,
-        // 👇 YEH LINE CONNECTION ISSUE SOLVE KAREGI
-        browser: ['Rasoi Setu Bot', 'Chrome', '1.0.0']
+        printQRInTerminal: false, // QR Code band kar diya hai
+        browser: ['Ubuntu', 'Chrome', '20.0.04'] // Safe browser name
     });
 
+    // 🔑 YAHAN PAIRING CODE GENERATE HOGA
+    if (!sock.authState.creds.registered) {
+        setTimeout(async () => {
+            try {
+                let code = await sock.requestPairingCode(phoneNumber);
+                code = code?.match(/.{1,4}/g)?.join("-") || code;
+                console.log(`\n==============================================`);
+                console.log(`👉 AAPKA PAIRING CODE HAI: ${code}`);
+                console.log(`==============================================\n`);
+            } catch (error) {
+                console.error("Pairing code error:", error);
+            }
+        }, 3000);
+    }
+
     sock.ev.on('connection.update', (update) => {
-        const { connection, qr } = update;
-        if (qr) {
-            console.log("\n👉 Apne WhatsApp Se Is QR Code Ko Scan Karein:");
-            qrcode.generate(qr, { small: true });
-        }
+        const { connection } = update;
         if (connection === 'close') {
             console.log('🔄 Connection close ho gaya, bot restart ho raha hai...');
-            startBot(); // Auto-restart
+            startBot(); 
         } else if (connection === 'open') {
             console.log('🎉 BINGO! Rasoi Setu B2B Bot WhatsApp Se Connect Ho Gaya Hai!');
         }
     });
 
-    // Login save rakhega
     sock.ev.on('creds.update', saveCreds);
 
-    // Naya message aane par
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
@@ -73,7 +81,6 @@ async function startBot() {
             try {
                 const lowerText = userText.toLowerCase().trim();
                 
-                // Welcome Menu
                 if (lowerText === 'hi' || lowerText === 'hello' || lowerText === 'demo' || lowerText === 'namaste') {
                     await sock.sendPresenceUpdate('composing', fromNumber);
                     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -85,7 +92,6 @@ async function startBot() {
                     return;
                 }
 
-                // Gemini AI Response
                 await sock.sendPresenceUpdate('composing', fromNumber);
                 
                 const response = await ai.models.generateContent({
@@ -97,8 +103,6 @@ async function startBot() {
                 });
                 
                 const botReply = response.text;
-
-                // Human-like typing delay
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
                 await sock.sendPresenceUpdate('paused', fromNumber);
