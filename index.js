@@ -12,7 +12,7 @@ if (!process.env.GEMINI_API_KEY) {
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // 👇 YAHAN APNA BOT WALA WHATSAPP NUMBER DALEIN (91 ke sath)
-const phoneNumber = "918860088652"; // Example: "919876543210"
+const phoneNumber = "918307602309"; // Example: "919876543210"
 
 const rasoiSetuPrompt = `
 Aap "Rasoi Setu" ke ek expert, professional aur helpful WhatsApp Chatbot hain. 
