@@ -27,59 +27,50 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-console.log("🔥 Firebase Permanent Memory Connected!");
 
-// 👇 YAHAN AAPKA WHATSAPP NUMBER SET HAI
+// 👇 YAHAN AAPKA BOT NUMBER SET HAI
 const botPhoneNumber = "918860088652"; 
 
 // 👇 MANAGER KA NUMBER JIS PAR ALERTS AAYENGE
 const managerNumber = "918618086211@s.whatsapp.net";
 
+// 🧠 NAYA AI PROMPT (Hinglish, Friendly, Short & Fixed Greeting)
 const rasoiSetuPrompt = `
-Aap "Rasoi Setu" ke ek behad polite, respectful aur professional WhatsApp Chatbot hain. 
-Aapko hamesha customer ki respect karni hai ('Aap', 'Ji' ka use karein) aur HINGLISH me baat karni hai.
+Aap "Rasoi Setu" ke ek bohot hi friendly, helpful aur polite WhatsApp Chatbot hain. 
+Aapko hamesha aasan "HINGLISH" me baat karni hai (Pure Hindi words jaise 'Kshama', 'Sampark' use mat karna. 'Sorry', 'Baat karein' use karna).
+Aapke replies hamesha chhote aur point-to-point hone chahiye (2-3 lines se zyada nahi).
 
-[RASOI SETU KI JANKARI]
-- About: Rasoi Setu ek restaurant growth partner hai jo restaurants ko unke operations manage karne mein madad karta hai. Yeh restaurants ko empower karta hai taaki wo apne customers se directly WhatsApp aur unki khud ki website ke zariye online orders le sakein.
-- How it works: Sabse pehle restaurant ko onboard kiya jata hai. Menu, payment aur ordering system setup hota hai. Customer WhatsApp/website se order place karte hain, jo instantly kitchen system tak pohoch jata hai. Fir restaurant khana prepare karke delivery/pickup ke liye bhej deta hai.
-- Features: WhatsApp bot, direct website ordering, seamless payment integration, kitchen order flow, table/order management, aur customer retention tools. Isse aggregator apps (Zomato/Swiggy) par dependency kam hoti hai.
-- Pricing: Pricing fix nahi hai. Flexible hai. Total outlets, WhatsApp bot, aur special integrations par depend karti hai.
-- Kiske liye sahi hai: QSR, cloud kitchens, cafés, dine-in, aur takeaway brands.
-- Kyun chunein: Direct customer ownership, better profit margins (no 3rd party commission), aur fast digital growth.
-- Demo/Support: Demo ke liye "rasoisetu.in" par jayein. Support ke liye "SUPPORT" type karein.
+[GREETING RULE - SABSE ZAROORI]
+Agar customer ka pehla message ho (jaise Hi, Hello, Hey), toh EXACTLY yeh reply dena hai, isme apni taraf se kuch add nahi karna:
+"👋 Hello! Rasoi Setu me aapka swagat hai.
 
-[IMPORTANT STRICT RULES - FOLLOW ALWAYS]
-1. Politeness: Hamesha polite rahein.
-2. Out of Box Queries: Agar customer koi aisi aam jankari puche jo Rasoi Setu se alag ho, toh use bas basic answer dein aur phir politely bolein: "Kshama karein, is baare mein mujhe zyada jankari nahi hai. Main Rasoi Setu ka assistant hu. Kya main aapki restaurant ordering system me kuch madad kar sakta hu?"
-3. MANAGER ALERT TRIGGER (MOST IMPORTANT): 
-   - Agar customer "Order" place kare, "Price / Costing" puche, ya "Call" karne ki request kare, toh aapko EXACTLY bas yahi reply dena hai: "Ji, main jaldi hi aapki hamare manager se baat karvata hu. [NOTIFY_MANAGER]"
-   (Note: Is condition me aapko iske alawa aur koi explanation nahi deni hai, bas yahi exact sentence use karna hai aur [NOTIFY_MANAGER] tag lagana hai).
+Hum restaurants, cafes aur cloud kitchens ko direct orders lene, zero commission par operate karne aur apna POS/Kitchen manage karne me madad karte hain. 🚀
+
+Aapko kis baare me jankari chahiye?
+1️⃣ Features & POS
+2️⃣ Pricing & Plans
+3️⃣ Book a Demo
+
+Aap apna sawal niche type kar sakte hain! 👇"
+
+[CONTACT / CALL RULE]
+Agar customer kisi bhi tarah se baat karne, call karne ya contact karne ke liye bole, toh aapko unhe friendly way me yeh number dena hai: +91 861 808 6211
+Aur us message ke end me [NOTIFY_MANAGER] tag zaroor lagana hai taaki manager ko alert chala jaye.
+Example: "Ji bilkul, aap humari team se is number par direct baat kar sakte hain: +91 861 808 6211 😊 [NOTIFY_MANAGER]"
+
+[OTHER RULES]
+- Agar customer "Pricing" ya "Demo" ka puche, toh unhe short me samajhayein aur usme bhi [NOTIFY_MANAGER] lagayein.
+- Out of topic (jo restaurant se related na ho) sawal ka bas politely chhota answer dein aur wapas Rasoi Setu par le aayein.
 `;
 
 async function startBot() {
-    // 🧹 FRESH LOGIN FOLDER
     const { state, saveCreds } = await useMultiFileAuthState('auth_session_fresh_v2');
 
     const sock = makeWASocket({
         auth: state,
-        // 👇 YAHAN HUMNE QR CODE ON KAR DIYA HAI
         printQRInTerminal: true, 
         browser: ['Ubuntu', 'Chrome', '20.0.04']
     });
-
-    if (!sock.authState.creds.registered) {
-        setTimeout(async () => {
-            try {
-                let code = await sock.requestPairingCode(botPhoneNumber);
-                code = code?.match(/.{1,4}/g)?.join("-") || code;
-                console.log(`\n==============================================`);
-                console.log(`👉 AAPKA PAIRING CODE HAI: ${code}`);
-                console.log(`==============================================\n`);
-            } catch (error) {
-                console.error("Pairing error:", error);
-            }
-        }, 3000);
-    }
 
     sock.ev.on('connection.update', (update) => {
         if (update.connection === 'close') startBot(); 
@@ -95,15 +86,17 @@ async function startBot() {
 
         const fromNumber = msg.key.remoteJid;
         
-        if (fromNumber.endsWith('@g.us')) return;
+        // Group messages aur WhatsApp Status updates ko ignore karein
+        if (fromNumber.endsWith('@g.us') || fromNumber === 'status@broadcast') return;
 
-        const rawNumber = fromNumber.split('@')[0];
+        // 🛠️ YAHI WOH FIX HAI JISSE NUMBER GALAT NAHI AAYEGA
+        const pureNumber = fromNumber.split('@')[0].split(':')[0]; 
         const userText = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
         if (userText) {
             try {
                 const dbRef = ref(db);
-                const snapshot = await get(child(dbRef, `chats/${rawNumber}`));
+                const snapshot = await get(child(dbRef, `chats/${pureNumber}`));
                 let chatHistory = [];
                 if (snapshot.exists()) {
                     chatHistory = snapshot.val().history || [];
@@ -120,9 +113,10 @@ async function startBot() {
                 const response = await chatSession.sendMessage({ message: userText });
                 let botReply = response.text;
 
+                // 🚨 MANAGER ALERT LOGIC
                 if (botReply.includes("[NOTIFY_MANAGER]")) {
                     botReply = botReply.replace("[NOTIFY_MANAGER]", "").trim();
-                    const alertMsg = `🚨 *NEW CUSTOMER ALERT* 🚨\n\n*Customer No:* +${rawNumber}\n*Direct Chat:* https://wa.me/${rawNumber}\n*Customer Said:* "${userText}"\n\n_Is customer ne Price/Call/Order ki request ki hai. Please jaldi contact karein!_`;
+                    const alertMsg = `🚨 *NEW CUSTOMER ALERT* 🚨\n\n*Customer No:* +${pureNumber}\n*Direct Chat:* https://wa.me/${pureNumber}\n*Customer Said:* "${userText}"\n\n_Is customer ne Price/Call/Order ki request ki hai. Please jaldi contact karein!_`;
                     
                     await sock.sendMessage(managerNumber, { text: alertMsg });
                     console.log(`📲 Manager Alert Sent to ${managerNumber}`);
@@ -132,7 +126,7 @@ async function startBot() {
                 await sock.sendMessage(fromNumber, { text: botReply });
 
                 const updatedHistory = await chatSession.getHistory();
-                await set(ref(db, 'chats/' + rawNumber), {
+                await set(ref(db, 'chats/' + pureNumber), {
                     history: updatedHistory,
                     lastUpdated: Date.now()
                 });
