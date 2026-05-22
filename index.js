@@ -1,28 +1,40 @@
 const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { GoogleGenAI } = require('@google/genai');
 const http = require('http');
-const { MongoClient } = require('mongodb');
+const { initializeApp } = require('firebase/app');
+const { getDatabase, ref, set, get, child } = require('firebase/database');
 
-// Render Server
+// Render Server Keep-Alive
 http.createServer((req, res) => res.end('Rasoi Setu Bot is alive!')).listen(process.env.PORT || 3000);
 
-// API Keys Check
-if (!process.env.GEMINI_API_KEY || !process.env.MONGO_URL) {
-    console.error("❌ ERROR: Gemini API Key ya MONGO_URL nahi mili!");
+if (!process.env.GEMINI_API_KEY) {
+    console.error("❌ ERROR: Gemini API Key nahi mili!");
     process.exit(1);
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const mongoClient = new MongoClient(process.env.MONGO_URL);
-let chatCollection;
 
-// 👇 YAHAN APNA WHATSAPP NUMBER DALEIN (Bot Wala)
+// 🔥 FIREBASE SETUP (Aapke Screenshot Se)
+const firebaseConfig = {
+  apiKey: "AIzaSyDec0PrkW4aaL5T4TiKIzywpUa3r7XuXQ4",
+  authDomain: "rasoisetubot.firebaseapp.com",
+  databaseURL: "https://rasoisetubot-default-rtdb.firebaseio.com",
+  projectId: "rasoisetubot",
+  storageBucket: "rasoisetubot.firebasestorage.app",
+  messagingSenderId: "829620203320",
+  appId: "1:829620203320:web:692220efbb385d64f05bcd"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+console.log("🔥 Firebase Permanent Memory Connected!");
+
+// 👇 YAHAN APNA WHATSAPP NUMBER DALEIN JISE BOT BANANA HAI
 const botPhoneNumber = "91XXXXXXXXXX"; 
 
-// 👇 YAHAN WOH NUMBER HAI JIS PAR ALERTS AAYENGE (Manager Number)
+// 👇 MANAGER KA NUMBER JIS PAR ALERTS AAYENGE
 const managerNumber = "918618086211@s.whatsapp.net";
 
-// 🧠 BOT KA TRAINING DATA AUR RULES
 const rasoiSetuPrompt = `
 Aap "Rasoi Setu" ke ek behad polite, respectful aur professional WhatsApp Chatbot hain. 
 Aapko hamesha customer ki respect karni hai ('Aap', 'Ji' ka use karein) aur HINGLISH me baat karni hai.
@@ -44,24 +56,7 @@ Aapko hamesha customer ki respect karni hai ('Aap', 'Ji' ka use karein) aur HING
    (Note: Is condition me aapko iske alawa aur koi explanation nahi deni hai, bas yahi exact sentence use karna hai aur [NOTIFY_MANAGER] tag lagana hai).
 `;
 
-// Database Connect Function
-async function connectDB() {
-    try {
-        await mongoClient.connect();
-        const db = mongoClient.db('RasoiSetuDB');
-        chatCollection = db.collection('user_chats');
-        
-        // 🧹 AUTO-CLEAN LOGIC: Agar kisi customer ne 5 din (432000 seconds) se message nahi kiya, toh uski memory delete ho jayegi
-        await chatCollection.createIndex({ "lastUpdated": 1 }, { expireAfterSeconds: 5 * 24 * 60 * 60 });
-        
-        console.log("💾 Permanent Memory Connected with Auto-Clean (5 Days)!");
-    } catch (err) {
-        console.error("Database connection error:", err);
-    }
-}
-
 async function startBot() {
-    await connectDB();
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
@@ -96,13 +91,18 @@ async function startBot() {
         if (!msg.message || msg.key.fromMe) return;
 
         const fromNumber = msg.key.remoteJid;
-        const rawNumber = fromNumber.split('@')[0]; // Customer ka asli number nikala
+        const rawNumber = fromNumber.split('@')[0];
         const userText = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
         if (userText) {
             try {
-                let userRecord = await chatCollection.findOne({ phone: fromNumber });
-                let chatHistory = userRecord ? userRecord.history : [];
+                // 🧠 FIREBASE SE PURANI MEMORY NIKALNA
+                const dbRef = ref(db);
+                const snapshot = await get(child(dbRef, `chats/${rawNumber}`));
+                let chatHistory = [];
+                if (snapshot.exists()) {
+                    chatHistory = snapshot.val().history || [];
+                }
 
                 const chatSession = ai.chats.create({
                     model: 'gemini-1.5-flash',
@@ -115,11 +115,9 @@ async function startBot() {
                 const response = await chatSession.sendMessage({ message: userText });
                 let botReply = response.text;
 
-                // 🚨 MANAGER ALERT LOGIC 🚨
+                // 🚨 MANAGER ALERT LOGIC
                 if (botReply.includes("[NOTIFY_MANAGER]")) {
                     botReply = botReply.replace("[NOTIFY_MANAGER]", "").trim();
-                    
-                    // 📞 ALERT WITH NUMBER AND DIRECT CHAT LINK
                     const alertMsg = `🚨 *NEW CUSTOMER ALERT* 🚨\n\n*Customer No:* +${rawNumber}\n*Direct Chat:* https://wa.me/${rawNumber}\n*Customer Said:* "${userText}"\n\n_Is customer ne Price/Call/Order ki request ki hai. Please jaldi contact karein!_`;
                     
                     await sock.sendMessage(managerNumber, { text: alertMsg });
@@ -129,19 +127,12 @@ async function startBot() {
                 await sock.sendPresenceUpdate('paused', fromNumber);
                 await sock.sendMessage(fromNumber, { text: botReply });
 
+                // 💾 FIREBASE ME NAYI MEMORY SAVE KARNA
                 const updatedHistory = await chatSession.getHistory();
-                
-                // History save karte waqt 'lastUpdated' time daal rahe hain taaki 5 din ka timer chalu ho sake
-                await chatCollection.updateOne(
-                    { phone: fromNumber },
-                    { 
-                        $set: { 
-                            history: updatedHistory,
-                            lastUpdated: new Date() // Current timestamp save hoga
-                        } 
-                    },
-                    { upsert: true }
-                );
+                await set(ref(db, 'chats/' + rawNumber), {
+                    history: updatedHistory,
+                    lastUpdated: Date.now()
+                });
 
             } catch (error) {
                 console.error("❌ Error:", error);
