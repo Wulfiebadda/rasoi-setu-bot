@@ -22,7 +22,7 @@ const botPhoneNumber = "91XXXXXXXXXX";
 // 👇 YAHAN WOH NUMBER HAI JIS PAR ALERTS AAYENGE (Manager Number)
 const managerNumber = "918618086211@s.whatsapp.net";
 
-// 🧠 BOT KA NAYA TRAINING DATA AUR RULES
+// 🧠 BOT KA TRAINING DATA AUR RULES
 const rasoiSetuPrompt = `
 Aap "Rasoi Setu" ke ek behad polite, respectful aur professional WhatsApp Chatbot hain. 
 Aapko hamesha customer ki respect karni hai ('Aap', 'Ji' ka use karein) aur HINGLISH me baat karni hai.
@@ -44,12 +44,17 @@ Aapko hamesha customer ki respect karni hai ('Aap', 'Ji' ka use karein) aur HING
    (Note: Is condition me aapko iske alawa aur koi explanation nahi deni hai, bas yahi exact sentence use karna hai aur [NOTIFY_MANAGER] tag lagana hai).
 `;
 
+// Database Connect Function
 async function connectDB() {
     try {
         await mongoClient.connect();
         const db = mongoClient.db('RasoiSetuDB');
         chatCollection = db.collection('user_chats');
-        console.log("💾 Permanent Memory Connected!");
+        
+        // 🧹 AUTO-CLEAN LOGIC: Agar kisi customer ne 5 din (432000 seconds) se message nahi kiya, toh uski memory delete ho jayegi
+        await chatCollection.createIndex({ "lastUpdated": 1 }, { expireAfterSeconds: 5 * 24 * 60 * 60 });
+        
+        console.log("💾 Permanent Memory Connected with Auto-Clean (5 Days)!");
     } catch (err) {
         console.error("Database connection error:", err);
     }
@@ -91,6 +96,7 @@ async function startBot() {
         if (!msg.message || msg.key.fromMe) return;
 
         const fromNumber = msg.key.remoteJid;
+        const rawNumber = fromNumber.split('@')[0]; // Customer ka asli number nikala
         const userText = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
         if (userText) {
@@ -113,7 +119,8 @@ async function startBot() {
                 if (botReply.includes("[NOTIFY_MANAGER]")) {
                     botReply = botReply.replace("[NOTIFY_MANAGER]", "").trim();
                     
-                    const alertMsg = `🚨 *NEW CUSTOMER ALERT* 🚨\n\n*Customer No:* +${fromNumber.split('@')[0]}\n*Customer Said:* "${userText}"\n\n_Is customer ne Price puchi hai, Call maanga hai, ya Order diya hai. Please inse contact karein!_`;
+                    // 📞 ALERT WITH NUMBER AND DIRECT CHAT LINK
+                    const alertMsg = `🚨 *NEW CUSTOMER ALERT* 🚨\n\n*Customer No:* +${rawNumber}\n*Direct Chat:* https://wa.me/${rawNumber}\n*Customer Said:* "${userText}"\n\n_Is customer ne Price/Call/Order ki request ki hai. Please jaldi contact karein!_`;
                     
                     await sock.sendMessage(managerNumber, { text: alertMsg });
                     console.log(`📲 Manager Alert Sent to ${managerNumber}`);
@@ -123,9 +130,16 @@ async function startBot() {
                 await sock.sendMessage(fromNumber, { text: botReply });
 
                 const updatedHistory = await chatSession.getHistory();
+                
+                // History save karte waqt 'lastUpdated' time daal rahe hain taaki 5 din ka timer chalu ho sake
                 await chatCollection.updateOne(
                     { phone: fromNumber },
-                    { $set: { history: updatedHistory } },
+                    { 
+                        $set: { 
+                            history: updatedHistory,
+                            lastUpdated: new Date() // Current timestamp save hoga
+                        } 
+                    },
                     { upsert: true }
                 );
 
