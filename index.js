@@ -57,7 +57,8 @@ Aapko hamesha customer ki respect karni hai ('Aap', 'Ji' ka use karein) aur HING
 `;
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+    // 🧹 PURANI FASSI HUI FILE KO BYPASS KARNE KE LIYE NAYA NAAM DALA HAI
+    const { state, saveCreds } = await useMultiFileAuthState('auth_session_fresh');
 
     const sock = makeWASocket({
         auth: state,
