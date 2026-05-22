@@ -29,7 +29,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 console.log("🔥 Firebase Permanent Memory Connected!");
 
-// 👇 YAHAN AAPKA NAYA WHATSAPP NUMBER SET HAI (Jise Bot Banana Hai)
+// 👇 YAHAN AAPKA WHATSAPP NUMBER SET HAI
 const botPhoneNumber = "918860088652"; 
 
 // 👇 MANAGER KA NUMBER JIS PAR ALERTS AAYENGE
@@ -57,12 +57,13 @@ Aapko hamesha customer ki respect karni hai ('Aap', 'Ji' ka use karein) aur HING
 `;
 
 async function startBot() {
-    // 🧹 PURANI FASSI HUI FILE KO BYPASS KARNE KE LIYE NAYA NAAM DALA HAI
-    const { state, saveCreds } = await useMultiFileAuthState('auth_session_fresh');
+    // 🧹 FRESH LOGIN FOLDER
+    const { state, saveCreds } = await useMultiFileAuthState('auth_session_fresh_v2');
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false,
+        // 👇 YAHAN HUMNE QR CODE ON KAR DIYA HAI
+        printQRInTerminal: true, 
         browser: ['Ubuntu', 'Chrome', '20.0.04']
     });
 
@@ -90,12 +91,10 @@ async function startBot() {
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         
-        // Yeh line ensure karti hai ki bot khud ko reply na kare
         if (!msg.message || msg.key.fromMe) return;
 
         const fromNumber = msg.key.remoteJid;
         
-        // Group messages ko ignore karne ke liye
         if (fromNumber.endsWith('@g.us')) return;
 
         const rawNumber = fromNumber.split('@')[0];
@@ -103,7 +102,6 @@ async function startBot() {
 
         if (userText) {
             try {
-                // 🧠 FIREBASE SE PURANI MEMORY NIKALNA
                 const dbRef = ref(db);
                 const snapshot = await get(child(dbRef, `chats/${rawNumber}`));
                 let chatHistory = [];
@@ -122,7 +120,6 @@ async function startBot() {
                 const response = await chatSession.sendMessage({ message: userText });
                 let botReply = response.text;
 
-                // 🚨 MANAGER ALERT LOGIC
                 if (botReply.includes("[NOTIFY_MANAGER]")) {
                     botReply = botReply.replace("[NOTIFY_MANAGER]", "").trim();
                     const alertMsg = `🚨 *NEW CUSTOMER ALERT* 🚨\n\n*Customer No:* +${rawNumber}\n*Direct Chat:* https://wa.me/${rawNumber}\n*Customer Said:* "${userText}"\n\n_Is customer ne Price/Call/Order ki request ki hai. Please jaldi contact karein!_`;
@@ -134,7 +131,6 @@ async function startBot() {
                 await sock.sendPresenceUpdate('paused', fromNumber);
                 await sock.sendMessage(fromNumber, { text: botReply });
 
-                // 💾 FIREBASE ME NAYI MEMORY SAVE KARNA
                 const updatedHistory = await chatSession.getHistory();
                 await set(ref(db, 'chats/' + rawNumber), {
                     history: updatedHistory,
