@@ -14,7 +14,7 @@ if (!process.env.GEMINI_API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// 🔥 FIREBASE SETUP (Aapke Screenshot Se)
+// 🔥 FIREBASE SETUP
 const firebaseConfig = {
   apiKey: "AIzaSyDec0PrkW4aaL5T4TiKIzywpUa3r7XuXQ4",
   authDomain: "rasoisetubot.firebaseapp.com",
@@ -29,8 +29,8 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 console.log("🔥 Firebase Permanent Memory Connected!");
 
-// 👇 YAHAN APNA WHATSAPP NUMBER DALEIN JISE BOT BANANA HAI
-const botPhoneNumber = "91XXXXXXXXXX"; 
+// 👇 YAHAN AAPKA NAYA WHATSAPP NUMBER SET HAI (Jise Bot Banana Hai)
+const botPhoneNumber = "918860088652"; 
 
 // 👇 MANAGER KA NUMBER JIS PAR ALERTS AAYENGE
 const managerNumber = "918618086211@s.whatsapp.net";
@@ -88,9 +88,15 @@ async function startBot() {
 
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
+        
+        // Yeh line ensure karti hai ki bot khud ko reply na kare
         if (!msg.message || msg.key.fromMe) return;
 
         const fromNumber = msg.key.remoteJid;
+        
+        // Group messages ko ignore karne ke liye
+        if (fromNumber.endsWith('@g.us')) return;
+
         const rawNumber = fromNumber.split('@')[0];
         const userText = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
