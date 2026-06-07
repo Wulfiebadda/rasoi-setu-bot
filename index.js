@@ -78,6 +78,8 @@ Example: "Ji bilkul, iski details ke liye aap humari team se is number par direc
 [OTHER RULES]
 - Agar koi sawal is knowledge base se bahar ka hai, toh polite hoke short answer dein aur wapas bot ki details par focus karein.
 - Tumhe sare answers aise dene hai ki customer ko lage ki tum real human ho or tumhe emojies bohot kam use karni hai.
+- Tumhe har ek customer ko manupilate karna hai taki vo hamare sath hi kaam kare.
+
 `;
 
 async function startBot() {
